@@ -14,7 +14,7 @@ use typst_kit::fonts::{FontSlot, Fonts};
 
 use crate::{
     error::Error,
-    spec::{CrateName, CrateVersionSpec},
+    spec::{CrateName, CrateVersion, CrateVersionSpec},
 };
 
 const OG_TEMPLATE_NAME: &str = "og-typst";
@@ -55,13 +55,13 @@ impl CrateData {
         struct CrateDataResponse {
             #[serde(rename = "crate")]
             krate: CrateDef,
-
             versions: Vec<CrateVersionDef>,
         }
 
         #[derive(Debug, serde::Deserialize)]
         struct CrateDef {
             description: String,
+            default_version: String,
         }
 
         #[derive(Debug, serde::Deserialize)]
@@ -80,11 +80,14 @@ impl CrateData {
             .json()
             .await?;
 
-        let version_str = version.to_string();
+        let version = match version {
+            CrateVersion::Latest => res.krate.default_version.parse()?,
+            CrateVersion::Version(version) => version,
+        };
         let downloads = res
             .versions
             .into_iter()
-            .find(|v| v.num == version_str)
+            .find(|v| v.num == version.to_string())
             .ok_or(Error::NotFound)?
             .downloads;
 

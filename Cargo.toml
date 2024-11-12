@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.93"
+axum = { version = "0.7.7", default-features = false, features = ["http1", "macros", "tokio"] }
 clap = { version = "4.5.20", features = ["derive", "env"] }
 dotenvy = { version = "0.15.7", default-features = false }
 minijinja = { version = "2.5.0", default-features = false }

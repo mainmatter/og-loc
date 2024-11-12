@@ -9,7 +9,37 @@ pub struct CrateVersionSpec {
     pub name: CrateName,
     /// The version of the crate
     #[arg(long, short, env)]
-    pub version: Version,
+    #[serde(default)]
+    pub version: CrateVersion,
+}
+
+#[derive(Clone, Debug, Default, Hash, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+pub enum CrateVersion {
+    #[default]
+    #[serde(alias = "latest")]
+    Latest,
+    #[serde(untagged)]
+    Version(Version),
+}
+
+impl fmt::Display for CrateVersion {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CrateVersion::Latest => "latest".fmt(f),
+            CrateVersion::Version(version) => version.fmt(f),
+        }
+    }
+}
+
+impl FromStr for CrateVersion {
+    type Err = semver::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "latest" => Ok(Self::Latest),
+            v => Ok(Self::Version(v.parse()?)),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, serde::Deserialize, serde::Serialize)]

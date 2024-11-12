@@ -1,10 +1,19 @@
 use std::{net::SocketAddr, path::PathBuf};
 
+use axum::{
+    body::Body,
+    extract::Path,
+    http::HeaderMap,
+    response::{IntoResponse, Response},
+    routing::get,
+    Router,
+};
 use convert::CrateData;
 
 use error::Error;
+use reqwest::header::{CONTENT_LENGTH, CONTENT_TYPE};
 use spec::CrateVersionSpec;
-use tokio::io::AsyncWriteExt;
+use tokio::{io::AsyncWriteExt, net::TcpListener};
 
 pub mod convert;
 pub mod error;
@@ -49,7 +58,28 @@ pub struct Serve {
 
 impl Serve {
     pub async fn run(self, _common: CommonArgs) -> Result<(), Error> {
-        todo!("Setup http server that serves png's given a path /og/:crate_name/:version")
+        #[axum::debug_handler]
+        async fn og(Path(spec): Path<CrateVersionSpec>) -> Result<Response, Error> {
+            let data = CrateData::augment_crate_version_spec(spec).await?;
+            let png = data.render_as_png();
+
+            let mut headers = HeaderMap::new();
+            headers.append(CONTENT_TYPE, "image/png".parse().unwrap());
+            headers.append(CONTENT_LENGTH, png.len().into());
+            let body = Body::from(png);
+
+            Ok((headers, body).into_response())
+        }
+
+        let app = Router::new()
+            .route("/og/:name", get(og))
+            .route("/og/:name/:version", get(og));
+
+        let listener = TcpListener::bind(self.addr).await?;
+
+        axum::serve(listener, app.into_make_service()).await?;
+
+        Ok(())
     }
 }
 
