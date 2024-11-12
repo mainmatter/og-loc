@@ -1,0 +1,13 @@
+---
+source: src/convert.rs
+expression: rendered
+snapshot_kind: text
+---
+#set page(
+    width: 1200pt,
+    height: 628pt
+)
+
+knien: 0.0.8 \
+Typed RabbitMQ interfacing for async Rust \
+Downloads: 738

@@ -1,0 +1,27 @@
+[package]
+name = "og-loc"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.93"
+clap = { version = "4.5.20", features = ["derive", "env"] }
+dotenvy = { version = "0.15.7", default-features = false }
+minijinja = { version = "2.5.0", default-features = false }
+reqwest = { version = "0.12.9", features = ["json"] }
+semver = { version = "1.0.23", default-features = false, features = ["serde", "std"] }
+serde = { version = "1.0.215", features = ["derive"] }
+serde_json = "1.0.132"
+thiserror = "2.0.3"
+tokio = { version = "1.41.1", default-features = false, features = ["fs", "macros", "rt", "rt-multi-thread"] }
+typst = "0.12.0"
+typst-kit = "0.12.0"
+typst-render = "0.12.0"
+
+[dev-dependencies]
+insta = "1.41.1"
+test-case = "3.3.1"
+
+[profile.dev.package]
+insta.opt-level = 3
+similar.opt-level = 3
