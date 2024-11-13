@@ -1,8 +1,18 @@
 #set page(
     width: 1200pt,
-    height: 628pt
+    height: 628pt,
+    fill: rgb("#edebdd"),
 )
 
-{{ krate.name }}: {{ krate.version }} \
-{{ krate.description }} \
+#set text(
+    size: 50pt,
+    font: "Fira Sans",
+     
+)
+
+= *{{ krate.name }}* v{{ krate.version }} \
+\
+_{{ krate.description}}_ \
+\
+\
 Downloads: {{ krate.downloads }}

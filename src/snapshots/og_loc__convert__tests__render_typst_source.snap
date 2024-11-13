@@ -5,9 +5,19 @@ snapshot_kind: text
 ---
 #set page(
     width: 1200pt,
-    height: 628pt
+    height: 628pt,
+    fill: rgb("#edebdd"),
 )
 
-knien: 0.0.8 \
-Typed RabbitMQ interfacing for async Rust \
+#set text(
+    size: 50pt,
+    font: "Fira Sans",
+     
+)
+
+= *knien* v0.0.8 \
+\
+_Typed RabbitMQ interfacing for async Rust_ \
+\
+\
 Downloads: 738
