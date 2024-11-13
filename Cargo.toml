@@ -2,6 +2,10 @@
 name = "og-loc"
 version = "0.1.0"
 edition = "2021"
+authors =  ["Henk Oordt <hd@oordt.dev>"]
+description = "Open Graph image generator for crates.io"
+readme = "README.md"
+repository = "https://github.com/mainmatter/og-loc"
 
 [dependencies]
 anyhow = "1.0.93"

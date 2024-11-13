@@ -57,6 +57,10 @@ pub struct Serve {
 }
 
 impl Serve {
+    /// Run the [`Serve`] subcommand. Sets up a simple HTTP server that
+    /// listens on the configured socket address and exposes the Open
+    /// Graph image generation funcationality under the `/og/:name` and
+    /// `/og/:name/:version` GET endpoints.
     pub async fn run(self, _common: CommonArgs) -> Result<(), Error> {
         #[axum::debug_handler]
         async fn og(Path(spec): Path<CrateVersionSpec>) -> Result<Response, Error> {

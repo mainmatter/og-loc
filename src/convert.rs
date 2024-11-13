@@ -17,8 +17,12 @@ use crate::{
     spec::{CrateName, CrateVersion, CrateVersionSpec},
 };
 
+/// Identifier for the Open Graph template in the
+/// [`minijinja::Environment`]
 const OG_TEMPLATE_NAME: &str = "og-typst";
 
+/// Set up the [`minijinja::Environment`] for rendering the
+/// Jinja2 template to Typst source.
 static TEMPLATE_ENV: LazyLock<minijinja::Environment> = LazyLock::new(|| {
     const OG_TEMPLATE_J2: &str = include_str!("../template.typ.j2");
     let mut env = Environment::new();
@@ -26,6 +30,8 @@ static TEMPLATE_ENV: LazyLock<minijinja::Environment> = LazyLock::new(|| {
     env
 });
 
+/// Set up a reusable HTTP client with a User Agent
+/// that allows for identifying this application.
 static HTTP_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
     const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
     const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -40,17 +46,30 @@ static HTTP_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
 });
 
 #[derive(Debug, serde::Serialize)]
+/// Crate data used for rendering the Jinja2 template
+/// to Typst source.
 pub struct CrateData {
+    /// The name of the crate
     pub name: CrateName,
+    /// The version of the crate
     pub version: Version,
+    /// The crate's description
     pub description: String,
+    /// The number of downloads of this version of the crate
     pub downloads: u64,
 }
 
 impl CrateData {
+    /// Augment a [`CrateVersionSpec`] to produce a [`CrateData`].
+    /// This function performs a HTTP request to the crates.io API,
+    /// in order to fetch details such as the crate's description
+    /// or the number of downloads for the specified version.
     pub async fn augment_crate_version_spec(
         CrateVersionSpec { name, version }: CrateVersionSpec,
     ) -> Result<Self, Error> {
+        // A buch of structs to deserialize
+        // the API response into.
+
         #[derive(Debug, serde::Deserialize)]
         struct CrateDataResponse {
             #[serde(rename = "crate")]
@@ -67,7 +86,7 @@ impl CrateData {
         #[derive(Debug, serde::Deserialize)]
         struct CrateVersionDef {
             downloads: u64,
-            num: String,
+            num: Version,
         }
 
         let url = format!("https://crates.io/api/v1/crates/{}", name);
@@ -87,7 +106,7 @@ impl CrateData {
         let downloads = res
             .versions
             .into_iter()
-            .find(|v| v.num == version.to_string())
+            .find(|v| v.num == version)
             .ok_or(Error::NotFound)?
             .downloads;
 
@@ -108,6 +127,7 @@ impl CrateData {
             .expect("Error rendering template")
     }
 
+    /// Render a PNG for this [`CrateData`] using [`typst`].
     pub fn render_as_png(&self) -> Vec<u8> {
         let typ = self.render_as_typst_source();
 
@@ -120,6 +140,9 @@ impl CrateData {
     }
 }
 
+/// Simple [`typst::World`] implementation that
+/// supports nothing more than what's needed to
+/// render the Open Grapth image template.
 struct OgTypstWorld {
     library: LazyHash<Library>,
     book: LazyHash<FontBook>,

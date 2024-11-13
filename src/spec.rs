@@ -2,6 +2,7 @@ use std::{fmt, str::FromStr};
 
 use semver::Version;
 
+/// Specification of a version of a crate
 #[derive(Clone, Debug, Hash, PartialEq, Eq, serde::Deserialize, serde::Serialize, clap::Args)]
 pub struct CrateVersionSpec {
     /// The name of the crate
@@ -13,6 +14,8 @@ pub struct CrateVersionSpec {
     pub version: CrateVersion,
 }
 
+/// Specification of a semver version. Can also represent
+/// the 'latest' version.
 #[derive(Clone, Debug, Default, Hash, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 pub enum CrateVersion {
     #[default]
@@ -42,6 +45,7 @@ impl FromStr for CrateVersion {
     }
 }
 
+/// A valid crate name.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(try_from = "&str")]
 pub struct CrateName(String);
@@ -52,6 +56,8 @@ impl fmt::Display for CrateName {
     }
 }
 
+/// Error caused by attempting to parse an invalid crate
+/// name as a [`CrateName`.]
 #[derive(Debug, PartialEq, Eq)]
 pub struct InvalidCrateName(String);
 
