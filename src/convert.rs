@@ -80,7 +80,7 @@ impl CrateData {
         #[derive(Debug, serde::Deserialize)]
         struct CrateDef {
             description: String,
-            default_version: String,
+            default_version: Version,
         }
 
         #[derive(Debug, serde::Deserialize)]
@@ -100,7 +100,7 @@ impl CrateData {
             .await?;
 
         let version = match version {
-            CrateVersion::Latest => res.krate.default_version.parse()?,
+            CrateVersion::Latest => res.krate.default_version,
             CrateVersion::Version(version) => version,
         };
         let downloads = res
