@@ -15,9 +15,7 @@ snapshot_kind: text
      
 )
 
-= *knien* v0.0.8 \
+= *knien* \
+\
 \
 _Typed RabbitMQ interfacing for async Rust_ \
-\
-\
-Downloads: 738

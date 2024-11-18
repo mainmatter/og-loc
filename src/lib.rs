@@ -12,7 +12,7 @@ use convert::CrateData;
 
 use error::Error;
 use reqwest::header::{CONTENT_LENGTH, CONTENT_TYPE};
-use spec::CrateVersionSpec;
+use spec::CrateName;
 use tokio::{io::AsyncWriteExt, net::TcpListener};
 
 pub mod convert;
@@ -63,7 +63,7 @@ impl Serve {
     /// `/og/:name/:version` GET endpoints.
     pub async fn run(self, _common: CommonArgs) -> Result<(), Error> {
         #[axum::debug_handler]
-        async fn og(Path(spec): Path<CrateVersionSpec>) -> Result<Response, Error> {
+        async fn og(Path(spec): Path<CrateName>) -> Result<Response, Error> {
             let data = CrateData::augment_crate_version_spec(spec).await?;
             let png = data.render_as_png();
 
@@ -76,8 +76,7 @@ impl Serve {
         }
 
         let app = Router::new()
-            .route("/og/:name", get(og))
-            .route("/og/:name/:version", get(og));
+            .route("/og/:name", get(og));
 
         let listener = TcpListener::bind(self.addr).await?;
 
@@ -89,8 +88,9 @@ impl Serve {
 
 #[derive(Debug, clap::Args)]
 pub struct OneShot {
-    #[clap(flatten)]
-    pub spec: CrateVersionSpec,
+    /// The name of the crate
+    #[arg(env, long, short)]
+    pub name: CrateName,
     /// The path to the PNG output file
     #[arg(env, long = "out", short)]
     pub out_path: PathBuf,
@@ -98,7 +98,7 @@ pub struct OneShot {
 
 impl OneShot {
     pub async fn run(self, _common: CommonArgs) -> Result<(), Error> {
-        let data = CrateData::augment_crate_version_spec(self.spec).await?;
+        let data = CrateData::augment_crate_version_spec(self.name).await?;
         let png = data.render_as_png();
         let mut out_file = tokio::fs::File::create(self.out_path).await?;
         out_file.write_all(&png).await?;

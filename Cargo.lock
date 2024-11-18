@@ -1630,7 +1630,6 @@ dependencies = [
  "insta",
  "minijinja",
  "reqwest",
- "semver",
  "serde",
  "serde_json",
  "test-case",
@@ -2275,15 +2274,6 @@ checksum = "fa39c7303dc58b5543c94d22c1766b0d31f2ee58306363ea622b10bbc075eaa2"
 dependencies = [
  "core-foundation-sys",
  "libc",
-]
-
-[[package]]
-name = "semver"
-version = "1.0.23"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61697e0a1c7e512e84a621326239844a24d8207b4669b41bc18b32ea5cbf988b"
-dependencies = [
- "serde",
 ]
 
 [[package]]

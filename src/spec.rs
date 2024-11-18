@@ -1,50 +1,5 @@
 use std::{fmt, str::FromStr};
 
-use semver::Version;
-
-/// Specification of a version of a crate
-#[derive(Clone, Debug, Hash, PartialEq, Eq, serde::Deserialize, serde::Serialize, clap::Args)]
-pub struct CrateVersionSpec {
-    /// The name of the crate
-    #[arg(long, short, env)]
-    pub name: CrateName,
-    /// The version of the crate
-    #[arg(long, short, env)]
-    #[serde(default)]
-    pub version: CrateVersion,
-}
-
-/// Specification of a semver version. Can also represent
-/// the 'latest' version.
-#[derive(Clone, Debug, Default, Hash, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
-pub enum CrateVersion {
-    #[default]
-    #[serde(alias = "latest")]
-    Latest,
-    #[serde(untagged)]
-    Version(Version),
-}
-
-impl fmt::Display for CrateVersion {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            CrateVersion::Latest => "latest".fmt(f),
-            CrateVersion::Version(version) => version.fmt(f),
-        }
-    }
-}
-
-impl FromStr for CrateVersion {
-    type Err = semver::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "latest" => Ok(Self::Latest),
-            v => Ok(Self::Version(v.parse()?)),
-        }
-    }
-}
-
 /// A valid crate name.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(try_from = "&str")]

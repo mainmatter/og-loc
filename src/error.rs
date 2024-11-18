@@ -12,9 +12,6 @@ pub enum Error {
     #[error("That's not a valid crate name: {0}")]
     InvalidCrateName(#[from] crate::spec::InvalidCrateName),
 
-    #[error("That's not a valid semver version identifier: {0}")]
-    InavlidCrateVersion(#[from] semver::Error),
-
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
@@ -28,7 +25,6 @@ impl Error {
             Error::Http(_) => StatusCode::SERVICE_UNAVAILABLE,
             Error::NotFound => StatusCode::NOT_FOUND,
             Error::InvalidCrateName(_) => StatusCode::BAD_REQUEST,
-            Error::InavlidCrateVersion(_) => StatusCode::BAD_REQUEST,
             Error::Io(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Error::Other(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }

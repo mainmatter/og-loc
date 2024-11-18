@@ -1,7 +1,6 @@
 use std::sync::LazyLock;
 
 use minijinja::{context, Environment};
-use semver::Version;
 use typst::{
     diag::{FileError, FileResult, Warned},
     foundations::{Bytes, Datetime},
@@ -12,10 +11,7 @@ use typst::{
 };
 use typst_kit::fonts::{FontSlot, Fonts};
 
-use crate::{
-    error::Error,
-    spec::{CrateName, CrateVersion, CrateVersionSpec},
-};
+use crate::{error::Error, spec::CrateName};
 
 /// Identifier for the Open Graph template in the
 /// [`minijinja::Environment`]
@@ -51,12 +47,8 @@ static HTTP_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
 pub struct CrateData {
     /// The name of the crate
     pub name: CrateName,
-    /// The version of the crate
-    pub version: Version,
     /// The crate's description
     pub description: String,
-    /// The number of downloads of this version of the crate
-    pub downloads: u64,
 }
 
 impl CrateData {
@@ -64,9 +56,7 @@ impl CrateData {
     /// This function performs a HTTP request to the crates.io API,
     /// in order to fetch details such as the crate's description
     /// or the number of downloads for the specified version.
-    pub async fn augment_crate_version_spec(
-        CrateVersionSpec { name, version }: CrateVersionSpec,
-    ) -> Result<Self, Error> {
+    pub async fn augment_crate_version_spec(name: CrateName) -> Result<Self, Error> {
         // A buch of structs to deserialize
         // the API response into.
 
@@ -74,19 +64,11 @@ impl CrateData {
         struct CrateDataResponse {
             #[serde(rename = "crate")]
             krate: CrateDef,
-            versions: Vec<CrateVersionDef>,
         }
 
         #[derive(Debug, serde::Deserialize)]
         struct CrateDef {
             description: String,
-            default_version: Version,
-        }
-
-        #[derive(Debug, serde::Deserialize)]
-        struct CrateVersionDef {
-            downloads: u64,
-            num: Version,
         }
 
         let url = format!("https://crates.io/api/v1/crates/{}", name);
@@ -99,22 +81,9 @@ impl CrateData {
             .json()
             .await?;
 
-        let version = match version {
-            CrateVersion::Latest => res.krate.default_version,
-            CrateVersion::Version(version) => version,
-        };
-        let downloads = res
-            .versions
-            .into_iter()
-            .find(|v| v.num == version)
-            .ok_or(Error::NotFound)?
-            .downloads;
-
         Ok(CrateData {
             name,
-            version,
             description: res.krate.description,
-            downloads,
         })
     }
 
@@ -195,17 +164,13 @@ impl typst::World for OgTypstWorld {
 
 #[cfg(test)]
 mod tests {
-    use crate::spec::CrateVersionSpec;
-
     use super::CrateData;
 
     #[test]
     fn render_typst_source() {
         let data = CrateData {
             name: "knien".parse().unwrap(),
-            version: "0.0.8".parse().unwrap(),
             description: "Typed RabbitMQ interfacing for async Rust".to_string(),
-            downloads: 738,
         };
 
         let rendered = data.render_as_typst_source();
@@ -216,9 +181,7 @@ mod tests {
     fn render_png() {
         let data = CrateData {
             name: "knien".parse().unwrap(),
-            version: "0.0.8".parse().unwrap(),
             description: "Typed RabbitMQ interfacing for async Rust".to_string(),
-            downloads: 738,
         };
         let rendered = data.render_as_png();
         insta::assert_binary_snapshot!(".png", rendered);
@@ -226,18 +189,13 @@ mod tests {
 
     #[tokio::test]
     async fn augment_crate_data() {
-        let spec = CrateVersionSpec {
-            name: "knien".parse().unwrap(),
-            version: "0.0.8".parse().unwrap(),
-        };
-
-        let data = CrateData::augment_crate_version_spec(spec).await.unwrap();
+        let data = CrateData::augment_crate_version_spec("knien".parse().unwrap())
+            .await
+            .unwrap();
         assert_eq!(data.name, "knien".parse().unwrap());
-        assert_eq!(data.version, "0.0.8".parse().unwrap());
         assert_eq!(
             data.description,
             "Typed RabbitMQ interfacing for async Rust"
         );
-        assert!(data.downloads >= 738); // As of Nov 12 2024
     }
 }
