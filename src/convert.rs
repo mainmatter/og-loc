@@ -1,4 +1,4 @@
-use std::sync::LazyLock;
+use std::sync::{Arc, LazyLock};
 
 use minijinja::{context, Environment};
 use typst::{
@@ -97,48 +97,64 @@ impl CrateData {
     }
 
     /// Render a PNG for this [`CrateData`] using [`typst`].
-    pub fn render_as_png(&self) -> Vec<u8> {
-        let typ = self.render_as_typst_source();
-
-        let world = OgTypstWorld::new(typ);
-        let Warned { output, .. } = typst::compile(&world);
-        let output = output.unwrap();
-        let page = &output.pages[0];
-        let pixmap = typst_render::render(page, 1.);
-        pixmap.encode_png().unwrap()
+    pub async fn render_as_png(self) -> Vec<u8> {
+        tokio::task::spawn_blocking(move || {
+            let typ = self.render_as_typst_source();
+            let world = OgTypstWorld::new(typ);
+            let Warned { output, .. } = typst::compile(&world);
+            let output = output.unwrap();
+            let page = &output.pages[0];
+            let pixmap = typst_render::render(page, 1.);
+            pixmap.encode_png().unwrap()
+        })
+        .await
+        .unwrap()
     }
 }
 
 /// Simple [`typst::World`] implementation that
 /// supports nothing more than what's needed to
 /// render the Open Grapth image template.
+/// Creating new [`OgTypstWorld`]s is cheap,
+/// as any shared resources are kept in a singleton.
 struct OgTypstWorld {
+    shared: Arc<OgTypstWorldShared>,
+    source: Source,
+}
+
+struct OgTypstWorldShared {
     library: LazyHash<Library>,
     book: LazyHash<FontBook>,
-    source: Source,
     fonts: Vec<FontSlot>,
 }
 
 impl OgTypstWorld {
     fn new(source: String) -> Self {
-        let fonts = Fonts::searcher().search();
+        static SHARED: LazyLock<Arc<OgTypstWorldShared>> = LazyLock::new(|| {
+            let fonts = Fonts::searcher().search();
+            let shared = OgTypstWorldShared {
+                library: LazyHash::new(Library::default()),
+                book: LazyHash::new(fonts.book),
+
+                fonts: fonts.fonts,
+            };
+            Arc::new(shared)
+        });
 
         Self {
-            library: LazyHash::new(Library::default()),
-            book: LazyHash::new(fonts.book),
             source: Source::detached(source),
-            fonts: fonts.fonts,
+            shared: SHARED.clone(),
         }
     }
 }
 
 impl typst::World for OgTypstWorld {
     fn library(&self) -> &LazyHash<Library> {
-        &self.library
+        &self.shared.library
     }
 
     fn book(&self) -> &LazyHash<FontBook> {
-        &self.book
+        &self.shared.book
     }
 
     fn main(&self) -> FileId {
@@ -154,7 +170,7 @@ impl typst::World for OgTypstWorld {
     }
 
     fn font(&self, index: usize) -> Option<Font> {
-        self.fonts[index].get()
+        self.shared.fonts[index].get()
     }
 
     fn today(&self, _offset: Option<i64>) -> Option<Datetime> {
@@ -177,13 +193,13 @@ mod tests {
         insta::assert_snapshot!(rendered);
     }
 
-    #[test]
-    fn render_png() {
+    #[tokio::test]
+    async fn render_png() {
         let data = CrateData {
             name: "knien".parse().unwrap(),
             description: "Typed RabbitMQ interfacing for async Rust".to_string(),
         };
-        let rendered = data.render_as_png();
+        let rendered = data.render_as_png().await;
         insta::assert_binary_snapshot!(".png", rendered);
     }
 

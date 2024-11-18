@@ -40,7 +40,7 @@ impl Bulk {
 
             tokio::spawn(async move {
                 let data = CrateData::augment_crate_version_spec(crate_name).await?;
-                let png = data.render_as_png();
+                let png = data.render_as_png().await;
 
                 let mut file = if self.force {
                     tokio::fs::File::create(path).await?

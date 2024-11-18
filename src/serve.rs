@@ -29,7 +29,7 @@ impl Serve {
         #[axum::debug_handler]
         async fn og(Path(spec): Path<CrateName>) -> Result<Response, Error> {
             let data = CrateData::augment_crate_version_spec(spec).await?;
-            let png = data.render_as_png();
+            let png = data.render_as_png().await;
 
             let mut headers = HeaderMap::new();
             headers.append(CONTENT_TYPE, "image/png".parse().unwrap());

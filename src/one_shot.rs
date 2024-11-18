@@ -17,7 +17,7 @@ pub struct OneShot {
 impl OneShot {
     pub async fn run(self, _common: CommonArgs) -> Result<(), Error> {
         let data = CrateData::augment_crate_version_spec(self.name).await?;
-        let png = data.render_as_png();
+        let png = data.render_as_png().await;
         let mut out_file = tokio::fs::File::create(self.out_path).await?;
         out_file.write_all(&png).await?;
 
