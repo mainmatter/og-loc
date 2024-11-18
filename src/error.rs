@@ -17,6 +17,9 @@ pub enum Error {
 
     #[error("Error: {0}")]
     Other(#[from] anyhow::Error),
+
+    #[error("Buld input error: {0}")]
+    BulkInput(#[from] crate::bulk::BulkInputError),
 }
 
 impl Error {
@@ -27,6 +30,7 @@ impl Error {
             Error::InvalidCrateName(_) => StatusCode::BAD_REQUEST,
             Error::Io(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Error::Other(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Error::BulkInput(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 }

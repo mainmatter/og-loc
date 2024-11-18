@@ -192,6 +192,7 @@ mod tests {
         let data = CrateData::augment_crate_version_spec("knien".parse().unwrap())
             .await
             .unwrap();
+
         assert_eq!(data.name, "knien".parse().unwrap());
         assert_eq!(
             data.description,

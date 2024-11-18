@@ -5,6 +5,10 @@ use std::{fmt, str::FromStr};
 #[serde(try_from = "&str")]
 pub struct CrateName(String);
 
+impl CrateName {
+    pub const MAX_LEN: usize = 64;
+}
+
 impl fmt::Display for CrateName {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
@@ -50,7 +54,7 @@ impl FromStr for CrateName {
         if name.is_empty() {
             return InvalidCrateName::err_with_msg("Crate names cannot be empty");
         }
-        if name.len() > 64 {
+        if name.len() > Self::MAX_LEN {
             return InvalidCrateName::err_with_msg(
                 "Crate names can not be longer than 64 characters",
             );
