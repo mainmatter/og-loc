@@ -1,9 +1,9 @@
-use std::{fmt, path::PathBuf, pin::pin, str::FromStr, vec};
+use std::{fmt, path::PathBuf, pin::pin, str::FromStr, task::Poll, vec};
 
 use futures_lite::{stream, FutureExt, Stream, StreamExt};
 use tokio::{
     fs::File,
-    io::{self, stdin, AsyncBufReadExt, AsyncWriteExt, BufReader, Lines, Stdin},
+    io::{self, stdin, AsyncBufReadExt, AsyncRead, AsyncWriteExt, BufReader, Lines, Stdin},
 };
 
 use crate::{
@@ -30,7 +30,7 @@ pub struct Bulk {
 
 impl Bulk {
     pub async fn run(self, _common: CommonArgs) -> Result<(), Error> {
-        let mut stream = self.input.as_stream().await?;
+        let mut stream = self.input.into_stream().await?;
         tokio::fs::create_dir_all(&self.out_folder).await?;
 
         while let Some(krate) = stream.next().await {
@@ -74,49 +74,51 @@ pub enum BulkInputError {
 }
 
 impl BulkInput {
-    pub async fn as_stream(
+    pub async fn into_stream(
         self,
     ) -> Result<impl Stream<Item = Result<CrateName, BulkInputError>>, io::Error> {
-        enum InputStream {
+        enum BulkInputStream {
             Path(Lines<BufReader<File>>),
             List(stream::Iter<vec::IntoIter<CrateName>>),
             StdIn(Lines<BufReader<Stdin>>),
         }
 
-        impl Stream for InputStream {
+        impl Stream for BulkInputStream {
             type Item = Result<CrateName, BulkInputError>;
 
             fn poll_next(
                 self: std::pin::Pin<&mut Self>,
                 cx: &mut std::task::Context<'_>,
             ) -> std::task::Poll<Option<Self::Item>> {
-                match self.get_mut() {
-                    InputStream::Path(lines) => pin!(lines.next_line()).poll(cx).map(|line| {
+                fn poll_next_name<R: AsyncRead + Unpin>(
+                    cx: &mut std::task::Context<'_>,
+                    lines: &mut Lines<BufReader<R>>,
+                ) -> Poll<Option<<BulkInputStream as Stream>::Item>> {
+                    pin!(lines.next_line()).poll(cx).map(|line| {
                         line.transpose().map(|l| {
                             l.map_err(Into::into)
                                 .and_then(|l| CrateName::from_str(&l).map_err(Into::into))
                         })
-                    }),
-                    InputStream::List(it) => {
+                    })
+                }
+
+                match self.get_mut() {
+                    BulkInputStream::Path(lines) => poll_next_name(cx, lines),
+                    BulkInputStream::List(it) => {
                         let it = pin!(it);
                         it.poll_next(cx).map(|n| n.map(Ok))
                     }
-                    InputStream::StdIn(lines) => pin!(lines.next_line()).poll(cx).map(|line| {
-                        line.transpose().map(|l| {
-                            l.map_err(Into::into)
-                                .and_then(|l| CrateName::from_str(&l).map_err(Into::into))
-                        })
-                    }),
+                    BulkInputStream::StdIn(lines) => poll_next_name(cx, lines),
                 }
             }
         }
 
         let stream = match self {
             BulkInput::Path(path_buf) => {
-                InputStream::Path(BufReader::new(File::open(path_buf).await?).lines())
+                BulkInputStream::Path(BufReader::new(File::open(path_buf).await?).lines())
             }
-            BulkInput::List(list) => InputStream::List(stream::iter(list.into_iter())),
-            BulkInput::StdIn => InputStream::StdIn(BufReader::new(stdin()).lines()),
+            BulkInput::List(list) => BulkInputStream::List(stream::iter(list.into_iter())),
+            BulkInput::StdIn => BulkInputStream::StdIn(BufReader::new(stdin()).lines()),
         };
 
         Ok(stream)
