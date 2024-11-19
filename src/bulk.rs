@@ -1,13 +1,14 @@
-use std::{fmt, path::PathBuf, pin::pin, str::FromStr, task::Poll, time::Duration, vec};
+use std::{fmt, path::PathBuf, pin::pin, str::FromStr, sync::Arc, task::Poll, vec};
 
 use futures_lite::{stream, FutureExt, Stream, StreamExt};
 use tokio::{
     fs::File,
     io::{self, stdin, AsyncBufReadExt, AsyncRead, AsyncWriteExt, BufReader, Lines, Stdin},
+    sync::Semaphore,
 };
 
 use crate::{
-    convert::CrateData,
+    augment::CrateDb,
     error::Error,
     spec::{CrateName, InvalidCrateName},
     CommonArgs,
@@ -18,14 +19,10 @@ pub struct Bulk {
     /// Force overwrite the output.
     #[arg(env, long, short)]
     pub force: bool,
-
-    #[arg(short, long, env, default_value_t = 10)]
-    rate_limit: u64,
-
     /// Input specifier. Either a comma-separated list of crate names, a path to a file containing a newline-separated list of crate names, or `-`, indicating stdin.
     /// Will first attempt to match input with `-`, then parse it as a comma-separated list of crate names, and then fall back to a path, only failing if an empty
     /// value is passed.
-    #[arg(env, long = "input", short)]
+    #[arg(env, long = "in", short)]
     pub input: BulkInput,
     /// The path of the folder to which the PNGs should be written
     #[arg(env, long = "out", short)]
@@ -33,22 +30,33 @@ pub struct Bulk {
 }
 
 impl Bulk {
-    pub async fn run(self, _common: CommonArgs) -> Result<(), Error> {
-        let mut stream = self.input.into_stream().await?;
+    pub async fn run(self, common: CommonArgs) -> Result<(), Error> {
+        let stream = self.input.into_stream().await?;
+        let items = stream
+            .map(|r| r.map(CrateName::into_inner))
+            .try_collect()
+            .await
+            .unwrap();
         tokio::fs::create_dir_all(&self.out_folder).await?;
-        let mut rate_limit_interval =
-            tokio::time::interval(Duration::from_micros(1_000_000 / self.rate_limit));
-        while let Some(krate) = stream.next().await {
-            rate_limit_interval.tick().await;
 
-            let crate_name = krate?;
-            let image_file_name = format!("{crate_name}.png");
+        // Add backpressure so we don't open too many files at once.
+        // 1000 should be on the safe side
+        let semaphore = Arc::new(Semaphore::new(1000));
+
+        let db = Arc::new(CrateDb::preload_many(common.db_dump_path, items).await?);
+
+        let mut tasks = tokio::task::JoinSet::new();
+        for data in db.augment_preloaded() {
+            let semaphore = semaphore.clone();
+            let permit = semaphore.acquire_owned().await.unwrap();
+            let image_file_name = format!("{}.png", data.name);
             let path = self.out_folder.join(image_file_name);
-
-            tokio::spawn(async move {
-                let data = CrateData::augment_crate_version_spec(crate_name).await?;
+            tasks.spawn(async move {
+                println!("🖼️  Generating image for crate '{}'", data.name);
+                // Move the permit to this task, so it only gets dropped
+                // once the task ends
+                let _permit = permit;
                 let png = data.render_as_png().await;
-
                 let mut file = if self.force {
                     tokio::fs::File::create(path).await?
                 } else {
@@ -59,7 +67,8 @@ impl Bulk {
                 Ok::<_, Error>(())
             });
         }
-        Ok(())
+
+        tasks.join_all().await.into_iter().collect()
     }
 }
 
