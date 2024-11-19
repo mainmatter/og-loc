@@ -1,4 +1,4 @@
-use std::{fmt, path::PathBuf, pin::pin, str::FromStr, task::Poll, vec};
+use std::{fmt, path::PathBuf, pin::pin, str::FromStr, task::Poll, time::Duration, vec};
 
 use futures_lite::{stream, FutureExt, Stream, StreamExt};
 use tokio::{
@@ -18,6 +18,10 @@ pub struct Bulk {
     /// Force overwrite the output.
     #[arg(env, long, short)]
     pub force: bool,
+
+    #[arg(short, long, env, default_value_t = 10)]
+    rate_limit: u64,
+
     /// Input specifier. Either a comma-separated list of crate names, a path to a file containing a newline-separated list of crate names, or `-`, indicating stdin.
     /// Will first attempt to match input with `-`, then parse it as a comma-separated list of crate names, and then fall back to a path, only failing if an empty
     /// value is passed.
@@ -32,8 +36,11 @@ impl Bulk {
     pub async fn run(self, _common: CommonArgs) -> Result<(), Error> {
         let mut stream = self.input.into_stream().await?;
         tokio::fs::create_dir_all(&self.out_folder).await?;
-
+        let mut rate_limit_interval =
+            tokio::time::interval(Duration::from_micros(1_000_000 / self.rate_limit));
         while let Some(krate) = stream.next().await {
+            rate_limit_interval.tick().await;
+
             let crate_name = krate?;
             let image_file_name = format!("{crate_name}.png");
             let path = self.out_folder.join(image_file_name);

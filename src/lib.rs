@@ -1,6 +1,7 @@
 use bulk::Bulk;
 use error::Error;
 use one_shot::OneShot;
+use prepare::Prepare;
 use serve::Serve;
 
 pub mod convert;
@@ -9,6 +10,7 @@ pub mod spec;
 
 pub mod bulk;
 pub mod one_shot;
+pub mod prepare;
 pub mod serve;
 
 #[derive(Debug, clap::Parser)]
@@ -25,6 +27,7 @@ impl Cli {
             Command::Serve(serve) => serve.run(self.common).await,
             Command::OneShot(one_shot) => one_shot.run(self.common).await,
             Command::Bulk(bulk) => bulk.run(self.common).await,
+            Command::Prepare(prepare) => prepare.run(self.common).await,
         }
     }
 }
@@ -42,4 +45,6 @@ pub enum Command {
     OneShot(OneShot),
     /// Do a bulk conversion
     Bulk(Bulk),
+    /// Prepare bulk conversion
+    Prepare(Prepare),
 }
