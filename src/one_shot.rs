@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use tokio::io::AsyncWriteExt;
 
-use crate::{convert::CrateData, error::Error, spec::CrateName, CommonArgs};
+use crate::{augment::CrateDb, error::Error, spec::CrateName, CommonArgs};
 
 #[derive(Debug, clap::Args)]
 pub struct OneShot {
@@ -15,8 +15,9 @@ pub struct OneShot {
 }
 
 impl OneShot {
-    pub async fn run(self, _common: CommonArgs) -> Result<(), Error> {
-        let data = CrateData::augment_crate_version_spec(self.name).await?;
+    pub async fn run(self, common: CommonArgs) -> Result<(), Error> {
+        let db = CrateDb::preload_one(common.db_dump_path, self.name.inner().clone()).await?;
+        let data = db.augment_crate_spec(self.name)?;
         let png = data.render_as_png().await;
         let mut out_file = tokio::fs::File::create(self.out_path).await?;
         out_file.write_all(&png).await?;

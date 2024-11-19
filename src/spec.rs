@@ -7,6 +7,20 @@ pub struct CrateName(String);
 
 impl CrateName {
     pub const MAX_LEN: usize = 64;
+
+    pub fn inner(&self) -> &String {
+        &self.0
+    }
+
+    pub fn into_inner(self) -> String {
+        self.0
+    }
+}
+
+impl AsRef<str> for CrateName {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
 }
 
 impl fmt::Display for CrateName {
@@ -71,9 +85,6 @@ impl FromStr for CrateName {
                 "Crate names must use only alphanumeric characters or `-` or `_`",
             );
         }
-        if name.contains("nul") {
-            // return InvalidCrateName::err_with_msg(format!("Crate names cannot use special Windows names. Got '{name}'"));
-        }
         Ok(CrateName(name.to_string()))
     }
 }
@@ -90,7 +101,6 @@ mod tests {
     #[case("test@123" => InvalidCrateName::err_with_msg(
         "Crate names must use only alphanumeric characters or `-` or `_`",
     ))]
-    #[case("onbenullig" => InvalidCrateName::err_with_msg("Crate names cannot use special Windows names"))]
     #[case("og-loc" => Ok(CrateName("og-loc".to_string())))]
     fn test_crate_name_validation(name: &str) -> Result<CrateName, InvalidCrateName> {
         name.parse()

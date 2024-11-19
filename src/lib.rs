@@ -1,16 +1,17 @@
+use std::path::PathBuf;
+
 use bulk::Bulk;
 use error::Error;
 use one_shot::OneShot;
-use prepare::Prepare;
 use serve::Serve;
 
+pub mod augment;
 pub mod convert;
 pub mod error;
 pub mod spec;
 
 pub mod bulk;
 pub mod one_shot;
-pub mod prepare;
 pub mod serve;
 
 #[derive(Debug, clap::Parser)]
@@ -27,14 +28,15 @@ impl Cli {
             Command::Serve(serve) => serve.run(self.common).await,
             Command::OneShot(one_shot) => one_shot.run(self.common).await,
             Command::Bulk(bulk) => bulk.run(self.common).await,
-            Command::Prepare(prepare) => prepare.run(self.common).await,
         }
     }
 }
 
 #[derive(Debug, clap::Args)]
 pub struct CommonArgs {
-    // TODO add common arguments as they come up
+    /// The path of the database dump
+    #[arg(short, long, env, default_value = "./db-dump.tar.gz")]
+    db_dump_path: PathBuf,
 }
 
 #[derive(Debug, clap::Subcommand)]
@@ -45,6 +47,4 @@ pub enum Command {
     OneShot(OneShot),
     /// Do a bulk conversion
     Bulk(Bulk),
-    /// Prepare bulk conversion
-    Prepare(Prepare),
 }

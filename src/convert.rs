@@ -1,5 +1,6 @@
 use std::sync::{Arc, LazyLock};
 
+use aho_corasick::AhoCorasick;
 use minijinja::{context, Environment};
 use typst::{
     diag::{FileError, FileResult, Warned},
@@ -11,7 +12,7 @@ use typst::{
 };
 use typst_kit::fonts::{FontSlot, Fonts};
 
-use crate::{error::Error, spec::CrateName};
+use crate::spec::CrateName;
 
 /// Identifier for the Open Graph template in the
 /// [`minijinja::Environment`]
@@ -26,21 +27,6 @@ static TEMPLATE_ENV: LazyLock<minijinja::Environment> = LazyLock::new(|| {
     env
 });
 
-/// Set up a reusable HTTP client with a User Agent
-/// that allows for identifying this application.
-pub static HTTP_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
-    const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
-    const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
-    const CARGO_PKG_REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
-
-    reqwest::ClientBuilder::new()
-        .user_agent(format!(
-            "{CARGO_PKG_NAME}/{CARGO_PKG_VERSION} ({CARGO_PKG_REPOSITORY})"
-        ))
-        .build()
-        .unwrap()
-});
-
 #[derive(Debug, serde::Serialize)]
 /// Crate data used for rendering the Jinja2 template
 /// to Typst source.
@@ -48,45 +34,56 @@ pub struct CrateData {
     /// The name of the crate
     pub name: CrateName,
     /// The crate's description
-    pub description: String,
+    pub description: TypstString,
+    /// The owners of the crate
+    pub owners: Vec<CrateOwner>,
+}
+
+#[derive(Debug, serde::Serialize)]
+/// A crate owner. Could either be a user or a team.
+pub struct CrateOwner {
+    /// Name of the crate owner
+    pub name: TypstString,
+    /// URL of the owner's avatar image
+    pub avatar: TypstString,
+}
+
+#[derive(Debug, serde::Serialize, PartialEq, Eq, Hash)]
+/// A string that is safe to use directly in typst source code.
+pub struct TypstString(String);
+
+impl From<&str> for TypstString {
+    fn from(s: &str) -> Self {
+        const NUM_REPLACE_ITEMS: usize = 6;
+        const REPLACE: [(&str, &str); NUM_REPLACE_ITEMS] = [
+            // TODO figure out whether this list is exhaustive and correct
+            ("#", r"\#"),
+            ("\\", "\\\\"),
+            ("^", r"\^"),
+            ("/", r"\/"),
+            ("$", r"\$"),
+            ("\"", r#"\""#),
+        ];
+
+        // Alas, <[N;T]>::map is not const, so instead we have to do this
+        static PATTERNS: LazyLock<[&str; NUM_REPLACE_ITEMS]> =
+            LazyLock::new(|| REPLACE.map(|(p, _)| p));
+        static ESCAPED: LazyLock<[&str; NUM_REPLACE_ITEMS]> =
+            LazyLock::new(|| REPLACE.map(|(_, e)| e));
+        static MATCHER: LazyLock<AhoCorasick> =
+            LazyLock::new(|| AhoCorasick::new(PATTERNS.iter()).expect("Error setting up matcher"));
+
+        Self(MATCHER.replace_all(s, &*ESCAPED))
+    }
+}
+
+impl From<String> for TypstString {
+    fn from(s: String) -> Self {
+        s.as_str().into()
+    }
 }
 
 impl CrateData {
-    /// Augment a [`CrateVersionSpec`] to produce a [`CrateData`].
-    /// This function performs a HTTP request to the crates.io API,
-    /// in order to fetch details such as the crate's description
-    /// or the number of downloads for the specified version.
-    pub async fn augment_crate_version_spec(name: CrateName) -> Result<Self, Error> {
-        // A buch of structs to deserialize
-        // the API response into.
-
-        #[derive(Debug, serde::Deserialize)]
-        struct CrateDataResponse {
-            #[serde(rename = "crate")]
-            krate: CrateDef,
-        }
-
-        #[derive(Debug, serde::Deserialize)]
-        struct CrateDef {
-            description: String,
-        }
-
-        let url = format!("https://crates.io/api/v1/crates/{}", name);
-        let res: CrateDataResponse = HTTP_CLIENT
-            .get(url)
-            .header(reqwest::header::ACCEPT, "application/json")
-            .send()
-            .await?
-            .error_for_status()?
-            .json()
-            .await?;
-
-        Ok(CrateData {
-            name,
-            description: res.krate.description,
-        })
-    }
-
     fn render_as_typst_source(&self) -> String {
         let template = TEMPLATE_ENV.get_template(OG_TEMPLATE_NAME).unwrap();
         template
@@ -100,14 +97,22 @@ impl CrateData {
     pub async fn render_as_png(self) -> Vec<u8> {
         tokio::task::spawn_blocking(move || {
             let typ = self.render_as_typst_source();
-            println!("{typ}");
             let world = OgTypstWorld::new(typ.clone());
             let Warned { output, warnings } = typst::compile(&world);
             if !warnings.is_empty() {
-                dbg!(&typ, warnings);
+                panic!("{warnings:?}");
             }
+            let output = output.unwrap_or_else(|e| {
+                e.into_iter().for_each(|e| {
+                    eprintln!("Error rendering image for crate {}: {e:?}", self.name)
+                });
+                eprintln!("Source:");
+                eprintln!("================");
+                eprintln!("{typ}");
+                eprintln!("================");
+                std::process::exit(-1);
+            });
 
-            let output = output.unwrap();
             let page = &output.pages[0];
             let pixmap = typst_render::render(page, 1.);
             pixmap.encode_png().unwrap()
@@ -185,13 +190,16 @@ impl typst::World for OgTypstWorld {
 
 #[cfg(test)]
 mod tests {
+    use crate::augment::CrateDb;
+
     use super::CrateData;
 
     #[test]
     fn render_typst_source() {
         let data = CrateData {
             name: "knien".parse().unwrap(),
-            description: "Typed RabbitMQ interfacing for async Rust".to_string(),
+            description: "Typed RabbitMQ interfacing for async Rust".into(),
+            owners: vec![],
         };
 
         let rendered = data.render_as_typst_source();
@@ -202,7 +210,8 @@ mod tests {
     async fn render_png() {
         let data = CrateData {
             name: "knien".parse().unwrap(),
-            description: "Typed RabbitMQ interfacing for async Rust".to_string(),
+            description: "Typed RabbitMQ interfacing for async Rust".into(),
+            owners: vec![],
         };
         let rendered = data.render_as_png().await;
         insta::assert_binary_snapshot!(".png", rendered);
@@ -210,14 +219,15 @@ mod tests {
 
     #[tokio::test]
     async fn augment_crate_data() {
-        let data = CrateData::augment_crate_version_spec("knien".parse().unwrap())
+        let db = CrateDb::preload_one("./db-dump.tar.gz", "knien".into())
             .await
             .unwrap();
+        let data = db.augment_crate_spec("knien".parse().unwrap()).unwrap();
 
         assert_eq!(data.name, "knien".parse().unwrap());
         assert_eq!(
             data.description,
-            "Typed RabbitMQ interfacing for async Rust"
+            "Typed RabbitMQ interfacing for async Rust".into()
         );
     }
 }
