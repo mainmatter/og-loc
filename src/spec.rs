@@ -72,7 +72,7 @@ impl FromStr for CrateName {
             );
         }
         if name.contains("nul") {
-            return InvalidCrateName::err_with_msg("Crate names cannot use special Windows names");
+            // return InvalidCrateName::err_with_msg(format!("Crate names cannot use special Windows names. Got '{name}'"));
         }
         Ok(CrateName(name.to_string()))
     }

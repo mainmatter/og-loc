@@ -28,7 +28,7 @@ static TEMPLATE_ENV: LazyLock<minijinja::Environment> = LazyLock::new(|| {
 
 /// Set up a reusable HTTP client with a User Agent
 /// that allows for identifying this application.
-static HTTP_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
+pub static HTTP_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
     const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
     const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
     const CARGO_PKG_REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
@@ -100,8 +100,13 @@ impl CrateData {
     pub async fn render_as_png(self) -> Vec<u8> {
         tokio::task::spawn_blocking(move || {
             let typ = self.render_as_typst_source();
-            let world = OgTypstWorld::new(typ);
-            let Warned { output, .. } = typst::compile(&world);
+            println!("{typ}");
+            let world = OgTypstWorld::new(typ.clone());
+            let Warned { output, warnings } = typst::compile(&world);
+            if !warnings.is_empty() {
+                dbg!(&typ, warnings);
+            }
+
             let output = output.unwrap();
             let page = &output.pages[0];
             let pixmap = typst_render::render(page, 1.);
