@@ -10,7 +10,23 @@
      
 )
 
-= *#"{{ krate.name }}"* \
-\
-\
-_#"{{ krate.description}}"_ \
+#align(top)[
+    = *#"{{ krate.name }}"*
+]
+
+#align(horizon)[
+    #text(size: 30pt)[
+        _#"{{ krate.description}}"_
+    ]
+]
+#align(bottom)[
+    #align(right)[
+        #grid(
+            columns: ({% for _ in krate.owners -%}auto, {%- endfor %}),
+            column-gutter: 20pt,
+            {%- for owner in krate.owners %}
+            image("{{ owner.avatar }}", width: 70pt),
+            {%- endfor %}
+        )
+    ]
+]

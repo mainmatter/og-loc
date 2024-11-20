@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::LazyLock};
 
 use bulk::Bulk;
 use error::Error;
@@ -48,3 +48,17 @@ pub enum Command {
     /// Do a bulk conversion
     Bulk(Bulk),
 }
+
+/// Set up a reusable HTTP client with a User Agent
+/// that allows for identifying this application.
+pub static HTTP_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
+    const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
+    const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
+    const CARGO_PKG_REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
+    reqwest::ClientBuilder::new()
+        .user_agent(format!(
+            "{CARGO_PKG_NAME}/{CARGO_PKG_VERSION} ({CARGO_PKG_REPOSITORY})"
+        ))
+        .build()
+        .unwrap()
+});

@@ -1,6 +1,7 @@
 use std::sync::{Arc, LazyLock};
 
 use aho_corasick::AhoCorasick;
+use dashmap::DashMap;
 use minijinja::{context, Environment};
 use typst::{
     diag::{FileError, FileResult, Warned},
@@ -12,7 +13,7 @@ use typst::{
 };
 use typst_kit::fonts::{FontSlot, Fonts};
 
-use crate::spec::CrateName;
+use crate::{spec::CrateName, HTTP_CLIENT};
 
 /// Identifier for the Open Graph template in the
 /// [`minijinja::Environment`]
@@ -27,7 +28,7 @@ static TEMPLATE_ENV: LazyLock<minijinja::Environment> = LazyLock::new(|| {
     env
 });
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, PartialEq, Eq, Clone, serde::Serialize)]
 /// Crate data used for rendering the Jinja2 template
 /// to Typst source.
 pub struct CrateData {
@@ -39,30 +40,27 @@ pub struct CrateData {
     pub owners: Vec<CrateOwner>,
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, PartialEq, Eq, Clone, serde::Serialize)]
 /// A crate owner. Could either be a user or a team.
 pub struct CrateOwner {
-    /// Name of the crate owner
-    pub name: TypstString,
     /// URL of the owner's avatar image
     pub avatar: TypstString,
 }
 
-#[derive(Debug, serde::Serialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, serde::Serialize, PartialEq, Eq, Hash)]
 /// A string that is safe to use directly in typst source code.
 pub struct TypstString(String);
 
 impl From<&str> for TypstString {
     fn from(s: &str) -> Self {
-        const NUM_REPLACE_ITEMS: usize = 6;
+        const NUM_REPLACE_ITEMS: usize = 5;
         const REPLACE: [(&str, &str); NUM_REPLACE_ITEMS] = [
             // TODO figure out whether this list is exhaustive and correct
             ("#", r"\#"),
-            ("\\", "\\\\"),
+            (r"\", r"\\"),
             ("^", r"\^"),
-            ("/", r"\/"),
             ("$", r"\$"),
-            ("\"", r#"\""#),
+            (r#"""#, r#"\""#),
         ];
 
         // Alas, <[N;T]>::map is not const, so instead we have to do this
@@ -90,7 +88,7 @@ impl CrateData {
             .render(context! {
                 krate => self
             })
-            .expect("Error rendering template")
+            .expect("Error rendering Jinja2 template")
     }
 
     /// Render a PNG for this [`CrateData`] using [`typst`].
@@ -127,6 +125,7 @@ impl CrateData {
 /// render the Open Grapth image template.
 /// Creating new [`OgTypstWorld`]s is cheap,
 /// as any shared resources are kept in a singleton.
+/// *To be used only in `tokio` context*
 struct OgTypstWorld {
     shared: Arc<OgTypstWorldShared>,
     source: Source,
@@ -136,6 +135,8 @@ struct OgTypstWorldShared {
     library: LazyHash<Library>,
     book: LazyHash<FontBook>,
     fonts: Vec<FontSlot>,
+    // TODO replace this with a moka cache
+    avatars: DashMap<FileId, Option<Bytes>>,
 }
 
 impl OgTypstWorld {
@@ -145,7 +146,7 @@ impl OgTypstWorld {
             let shared = OgTypstWorldShared {
                 library: LazyHash::new(Library::default()),
                 book: LazyHash::new(fonts.book),
-
+                avatars: DashMap::new(),
                 fonts: fonts.fonts,
             };
             Arc::new(shared)
@@ -175,8 +176,29 @@ impl typst::World for OgTypstWorld {
         Ok(self.source.clone())
     }
 
-    fn file(&self, _id: FileId) -> FileResult<Bytes> {
-        Err(FileError::Other(None))
+    fn file(&self, id: FileId) -> FileResult<Bytes> {
+        self.shared
+            .avatars
+            .entry(id)
+            .or_insert_with(|| {
+                tokio::runtime::Handle::current().block_on(async {
+                    // TODO parse and validate URL
+                    let url = id.vpath().as_rootless_path().to_str()?;
+                    let body = HTTP_CLIENT
+                        .get(url)
+                        .send()
+                        .await
+                        .ok()?
+                        .error_for_status()
+                        .ok()?
+                        .bytes()
+                        .await
+                        .ok()?;
+                    Some(Bytes::from(body.to_vec()))
+                })
+            })
+            .clone()
+            .ok_or(FileError::Other(None))
     }
 
     fn font(&self, index: usize) -> Option<Font> {
@@ -190,30 +212,34 @@ impl typst::World for OgTypstWorld {
 
 #[cfg(test)]
 mod tests {
-    use crate::augment::CrateDb;
+    use std::sync::LazyLock;
+
+    use crate::{augment::CrateDb, convert::CrateOwner};
 
     use super::CrateData;
 
+    const KNIEN_CRATE_DATA: LazyLock<CrateData> = LazyLock::new(|| CrateData {
+        name: "knien".parse().unwrap(),
+        description: "Typed RabbitMQ interfacing for async Rust".into(),
+        owners: vec![
+            CrateOwner {
+                avatar: "https://avatars.githubusercontent.com/u/17907879?v=4".into(),
+            },
+            CrateOwner {
+                avatar: "https://avatars.githubusercontent.com/u/8545127?v=4".into(),
+            },
+        ],
+    });
+
     #[test]
     fn render_typst_source() {
-        let data = CrateData {
-            name: "knien".parse().unwrap(),
-            description: "Typed RabbitMQ interfacing for async Rust".into(),
-            owners: vec![],
-        };
-
-        let rendered = data.render_as_typst_source();
+        let rendered = KNIEN_CRATE_DATA.render_as_typst_source();
         insta::assert_snapshot!(rendered);
     }
 
     #[tokio::test]
     async fn render_png() {
-        let data = CrateData {
-            name: "knien".parse().unwrap(),
-            description: "Typed RabbitMQ interfacing for async Rust".into(),
-            owners: vec![],
-        };
-        let rendered = data.render_as_png().await;
+        let rendered = KNIEN_CRATE_DATA.clone().render_as_png().await;
         insta::assert_binary_snapshot!(".png", rendered);
     }
 
@@ -224,10 +250,6 @@ mod tests {
             .unwrap();
         let data = db.augment_crate_spec("knien".parse().unwrap()).unwrap();
 
-        assert_eq!(data.name, "knien".parse().unwrap());
-        assert_eq!(
-            data.description,
-            "Typed RabbitMQ interfacing for async Rust".into()
-        );
+        assert_eq!(&data, &*KNIEN_CRATE_DATA);
     }
 }

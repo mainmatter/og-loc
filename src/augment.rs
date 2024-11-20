@@ -20,7 +20,6 @@ struct DbDumpCrateData {
 
 #[derive(Debug, Hash)]
 struct DbDumpCrateOwnerData {
-    name: String,
     avatar: String,
 }
 
@@ -91,18 +90,7 @@ impl CrateDb {
                 crate_owners
                     .borrow_mut()
                     .entry(OwnerId::Team(t.id))
-                    .and_modify(|co| {
-                        let org = t
-                            .login
-                            .split(':')
-                            .nth(1)
-                            .expect("team login should be of form 'github:<org>:<team>'");
-                        let name = format!("{org}/{}", t.name);
-                        *co = Some(DbDumpCrateOwnerData {
-                            name,
-                            avatar: t.avatar,
-                        })
-                    });
+                    .and_modify(|co| *co = Some(DbDumpCrateOwnerData { avatar: t.avatar }));
             });
             loader.load(dump_path.as_ref())?;
 
@@ -113,7 +101,6 @@ impl CrateDb {
                     .entry(OwnerId::User(u.id))
                     .and_modify(|co| {
                         *co = Some(DbDumpCrateOwnerData {
-                            name: u.name.unwrap_or(u.gh_login),
                             avatar: u.gh_avatar,
                         })
                     });
@@ -165,8 +152,7 @@ impl CrateDb {
             .owners
             .iter()
             .flat_map(|o| self.crate_owners[o].iter())
-            .map(|DbDumpCrateOwnerData { name, avatar }| CrateOwner {
-                name: name.clone().into(),
+            .map(|DbDumpCrateOwnerData { avatar }| CrateOwner {
                 avatar: avatar.clone().into(),
             })
             .collect();

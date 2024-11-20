@@ -15,7 +15,22 @@ snapshot_kind: text
      
 )
 
-= *#"knien"* \
-\
-\
-_#"Typed RabbitMQ interfacing for async Rust"_ \
+#align(top)[
+    = *#"knien"*
+]
+
+#align(horizon)[
+    #text(size: 30pt)[
+        _#"Typed RabbitMQ interfacing for async Rust"_
+    ]
+]
+#align(bottom)[
+    #align(right)[
+        #grid(
+            columns: (auto,auto,),
+            column-gutter: 20pt,
+            image("https://avatars.githubusercontent.com/u/17907879?v=4", width: 70pt),
+            image("https://avatars.githubusercontent.com/u/8545127?v=4", width: 70pt),
+        )
+    ]
+]
