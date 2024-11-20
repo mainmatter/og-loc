@@ -4,7 +4,7 @@ use std::{
     path::Path,
 };
 
-use db_dump::{crate_owners::OwnerId, crates::CrateId};
+use db_dump::{crate_owners::OwnerId, crates::CrateId, versions::VersionId};
 
 use crate::{
     convert::{CrateData, CrateOwner},
@@ -28,6 +28,8 @@ pub struct CrateDb {
     crates: HashMap<CrateId, DbDumpCrateData>,
     crate_names: HashMap<String, CrateId>,
     crate_owners: HashMap<OwnerId, Option<DbDumpCrateOwnerData>>,
+    crate_default_versions: HashMap<CrateId, Option<VersionId>>,
+    version_licenses: HashMap<(CrateId, VersionId), String>,
 }
 
 pub enum LoadFilter {
@@ -53,6 +55,8 @@ impl CrateDb {
     ) -> Result<Self, Error> {
         let crates = RefCell::new(HashMap::new());
         let crate_owners = RefCell::new(HashMap::new());
+        let crate_default_versions = RefCell::new(HashMap::new());
+        let mut version_licenses = HashMap::new();
         let mut crate_names = HashMap::new();
         {
             // Sadly, the order in which the CSVs are loaded is non-deterministic,
@@ -72,9 +76,10 @@ impl CrateDb {
                     owners: vec![],
                 };
                 crates.borrow_mut().insert(c.id, data);
+                crate_default_versions.borrow_mut().insert(c.id, None);
                 crate_names.insert(c.name, c.id);
             });
-            loader.load(dump_path.as_ref())?;
+            loader.load(&dump_path)?;
 
             let mut loader = db_dump::Loader::new();
             loader.crate_owners(|co| {
@@ -83,7 +88,7 @@ impl CrateDb {
                     c.owners.push(co.owner_id);
                 });
             });
-            loader.load(dump_path.as_ref())?;
+            loader.load(&dump_path)?;
 
             let mut loader = db_dump::Loader::new();
             loader.teams(|t| {
@@ -92,7 +97,7 @@ impl CrateDb {
                     .entry(OwnerId::Team(t.id))
                     .and_modify(|co| *co = Some(DbDumpCrateOwnerData { avatar: t.avatar }));
             });
-            loader.load(dump_path.as_ref())?;
+            loader.load(&dump_path)?;
 
             let mut loader = db_dump::Loader::new();
             loader.users(|u| {
@@ -105,14 +110,40 @@ impl CrateDb {
                         })
                     });
             });
-            loader.load(dump_path.as_ref())?;
+            loader.load(&dump_path)?;
+
+            let mut loader = db_dump::Loader::new();
+            loader.default_versions(|dv| {
+                crate_default_versions
+                    .borrow_mut()
+                    .entry(dv.crate_id)
+                    .and_modify(|v| *v = Some(dv.version_id));
+            });
+            loader.load(&dump_path)?;
+
+            let mut loader = db_dump::Loader::new();
+            loader.versions(|v| {
+                if let Some(cid) = crate_default_versions.borrow().get(&v.crate_id) {
+                    let (cid, vid) = match cid.as_ref() {
+                        Some(vid) if *vid == v.id => (v.crate_id, v.id),
+                        _ => return,
+                    };
+                    version_licenses.insert((cid, vid), v.license);
+                }
+            });
+            loader.load(&dump_path)?;
         }
+
         let crates = crates.into_inner();
         let crate_owners = crate_owners.into_inner();
+        let crate_default_versions = crate_default_versions.into_inner();
+
         Ok(Self {
             crates,
             crate_names,
             crate_owners,
+            crate_default_versions,
+            version_licenses,
         })
     }
 
@@ -148,6 +179,12 @@ impl CrateDb {
         let id = self.crate_names.get(name.as_ref()).ok_or(Error::NotFound)?;
         let data = &self.crates[id];
 
+        let default_version =
+            &self.crate_default_versions[id].expect("Every crate has a default version");
+        let license = self.version_licenses[&(*id, *default_version)]
+            .as_str()
+            .into();
+
         let owners = data
             .owners
             .iter()
@@ -161,6 +198,7 @@ impl CrateDb {
             name,
             description: data.description.clone().into(),
             owners,
+            license,
         })
     }
 

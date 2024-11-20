@@ -10,23 +10,28 @@
      
 )
 
-#align(top)[
+#place(top)[
     = *#"{{ krate.name }}"*
 ]
 
-#align(horizon)[
+#place(horizon)[
     #text(size: 30pt)[
         _#"{{ krate.description}}"_
     ]
 ]
-#align(bottom)[
-    #align(right)[
-        #grid(
-            columns: ({% for _ in krate.owners -%}auto, {%- endfor %}),
-            column-gutter: 20pt,
-            {%- for owner in krate.owners %}
-            image("{{ owner.avatar }}", width: 70pt),
-            {%- endfor %}
-        )
+
+#place(bottom + left)[
+    #text(size: 30pt)[
+        ⚖️ #"{{krate.license}}"
     ]
+]
+
+#place(bottom + right)[
+    #grid(
+        columns: ({% for _ in krate.owners -%}auto, {%- endfor %}),
+        column-gutter: 20pt,
+        {%- for owner in krate.owners %}
+        image("{{ owner.avatar }}", width: 70pt),
+        {%- endfor %}
+    )
 ]
