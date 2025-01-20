@@ -10,8 +10,9 @@ Open Graph image generator for crates.io
 
 ## Running
 OG Loc gets its data from Crates.io database dumps, which are loaded in a set of hash maps each time the application starts.
-First, you'll need the latest Crates.io database dump, which you can fetch from <https://static.crates.io/db-dump.tar.gz
->. Using `wget`:
+First, you'll need the latest Crates.io database dump, which you can fetch from <https://static.crates.io/db-dump.tar.gz>.
+
+Using `wget`:
 
 ```bash
 wget https://static.crates.io/db-dump.tar.gz
