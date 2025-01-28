@@ -1,4 +1,4 @@
-use std::{fmt, path::PathBuf, pin::pin, str::FromStr, sync::Arc, task::Poll, vec};
+use std::{fmt, path::PathBuf, pin::pin, str::FromStr, sync::Arc, task::Poll, time::Duration, vec};
 
 use futures_lite::{stream, FutureExt, Stream, StreamExt};
 use tokio::{
@@ -19,6 +19,9 @@ pub struct Bulk {
     /// Force overwrite the output.
     #[arg(env, long, short)]
     pub force: bool,
+    /// The number of images to render per second.
+    #[arg(env, long, short, default_value_t = 1)]
+    pub rate: u64,
     /// Input specifier. Either a comma-separated list of crate names, a path to a file containing a newline-separated list of crate names, or `-`, indicating stdin.
     /// Will first attempt to match input with `-`, then parse it as a comma-separated list of crate names, and then fall back to a path, only failing if an empty
     /// value is passed.
@@ -42,13 +45,16 @@ impl Bulk {
         // Add backpressure so we don't open too many files at once.
         // 1000 should be on the safe side
         let semaphore = Arc::new(Semaphore::new(1000));
+        // Rate limiter so we don't go fetch images from GitHub too often.
+        let mut rate_limit_ticker =
+            tokio::time::interval(Duration::from_micros(1000000 / self.rate));
 
         let db = Arc::new(CrateDb::preload_many(common.db_dump_path, items).await?);
 
         let mut tasks = tokio::task::JoinSet::new();
         for data in db.augment_preloaded() {
-            let semaphore = semaphore.clone();
-            let permit = semaphore.acquire_owned().await.unwrap();
+            rate_limit_ticker.tick().await;
+            let permit = semaphore.clone().acquire_owned().await.unwrap();
             let image_file_name = format!("{}.png", data.name);
             let path = self.out_folder.join(image_file_name);
             tasks.spawn(async move {

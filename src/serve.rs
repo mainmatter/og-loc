@@ -7,13 +7,15 @@ use axum::{
         header::{CONTENT_LENGTH, CONTENT_TYPE},
         HeaderMap,
     },
-    response::{IntoResponse, Response},
+    response::{IntoResponse, Redirect, Response},
     routing::get,
     Router,
 };
 use tokio::net::TcpListener;
 
 use crate::{augment::CrateDb, error::Error, spec::CrateName, CommonArgs};
+
+const OG_IMAGE_FALLBACK_URL: &str = "https://crates.io/assets/og-image.png";
 
 #[derive(Debug, clap::Args)]
 pub struct Serve {
@@ -34,7 +36,10 @@ impl Serve {
             Path(spec): Path<CrateName>,
             State(db): State<Arc<CrateDb>>,
         ) -> Result<Response, Error> {
-            let data = db.augment_crate_spec(spec)?;
+            let Ok(data) = db.augment_crate_spec(spec) else {
+                // If anything went wrong, just redirect to the fallback OG image
+                return Ok(Redirect::temporary(OG_IMAGE_FALLBACK_URL).into_response());
+            };
             let png = data.render_as_png().await;
 
             let mut headers = HeaderMap::new();
@@ -46,8 +51,8 @@ impl Serve {
         }
 
         let app = Router::new()
-            .route("/og/:name", get(og))
-            .route("/og/:name/", get(og))
+            .route("/og/{name}", get(og))
+            .route("/og/{name}/", get(og))
             .with_state(Arc::new(db));
 
         let listener = TcpListener::bind(self.addr).await?;
