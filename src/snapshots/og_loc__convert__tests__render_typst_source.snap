@@ -1,41 +1,73 @@
 ---
 source: src/convert.rs
 expression: rendered
-snapshot_kind: text
 ---
 #set page(
     width: 1200pt,
     height: 628pt,
-    fill: rgb("#edebdd"),
+    fill: rgb("#264323"),
+    margin: (x:0pt, y: 0pt)
 )
 
 #set text(
-    size: 50pt,
     font: "Fira Sans",
-     
+    fill: rgb("#FFFFFF"),
+    hyphenate: false,
 )
 
-#align(top)[
-    = *#"knien"*
-]
+#show image.where(alt: "team_image"): it => box(
+  radius: 10pt,
+  clip: true
+)[#it]
 
-#align(horizon)[
-    #text(size: 30pt)[
-        _#"Typed RabbitMQ interfacing for async Rust"_
+#show image.where(alt: "user_image"): it => box(
+  radius: 35pt,
+  clip: true,
+  stroke: white,
+)[#it]
+
+#place(top, dx: 75pt, dy: 75pt, float: true, scope: "parent")[
+    #block(width: 1000pt)[
+        #block[
+            #set text(
+                size: 64pt,
+                weight: "bold"
+            )
+            #show regex("([a-z|0-9|_])+"): it => {
+                it.text.codepoints().join(sym.zws)
+            }
+
+            *#"knien"*
+        ]
+
+        #block(above: 40pt)[
+            #set text(
+                size: 40pt,
+                weight: "regular",
+            )
+
+            #"Typed RabbitMQ interfacing for async Rust"
+        ]
+        #block(above: 40pt)[
+            #stack(
+                dir: rtl,
+                spacing: -5pt,
+                image("https://avatars.githubusercontent.com/u/17907879?v=4&s=70", width: 70pt),
+                image("https://avatars.githubusercontent.com/u/8545127?v=4&s=70", width: 70pt),
+            )
+        ]
     ]
 ]
 
-#place(bottom + left)[
-    #text(size: 30pt)[
-        ⚖️ #"MIT OR Apache-2.0"
-    ]
+#place(bottom + right, dy: -40pt, dx: -45pt, float: true, scope: "parent")[
+    #image("cargo.png")
 ]
+#place(bottom + left, dx: 75pt, dy: -75pt, float: true, scope: "parent")[
+    #block[
+        #set text(
+            size: 32pt,
+        )
 
-#place(bottom + right)[
-    #grid(
-        columns: (auto,auto,),
-        column-gutter: 20pt,
-        image("https://avatars.githubusercontent.com/u/17907879?v=4", width: 70pt),
-        image("https://avatars.githubusercontent.com/u/8545127?v=4", width: 70pt),
-    )
+        #"crates.io"
+    ]
 ]

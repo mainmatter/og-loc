@@ -1,37 +1,73 @@
 #set page(
     width: 1200pt,
     height: 628pt,
-    fill: rgb("#edebdd"),
+    fill: rgb("#264323"),
+    margin: (x:0pt, y: 0pt)
 )
 
 #set text(
-    size: 50pt,
     font: "Fira Sans",
-     
+    fill: rgb("#FFFFFF"),
+    hyphenate: false,
 )
 
-#place(top)[
-    = *#"{{ krate.name }}"*
-]
+#show image.where(alt: "team_image"): it => box(
+  radius: 10pt,
+  clip: true
+)[#it]
 
-#place(horizon)[
-    #text(size: 30pt)[
-        _#"{{ krate.description}}"_
+#show image.where(alt: "user_image"): it => box(
+  radius: 35pt,
+  clip: true,
+  stroke: white,
+)[#it]
+
+#place(top, dx: 75pt, dy: 75pt, float: true, scope: "parent")[
+    #block(width: 1000pt)[
+        #block[
+            #set text(
+                size: 64pt,
+                weight: "bold"
+            )
+            #show regex("([a-z|0-9|_])+"): it => {
+                it.text.codepoints().join(sym.zws)
+            }
+
+            *#"{{ krate.name }}"*
+        ]
+
+        #block(above: 40pt)[
+            #set text(
+                size: 40pt,
+                weight: "regular",
+            )
+
+            #"{{ krate.description }}"
+        ]
+        #block(above: 40pt)[
+            #stack(
+                dir: rtl,
+                spacing: -5pt,
+                {%- for owner in krate.user_owners %}
+                image("{{ owner.avatar }}", width: 70pt),
+                {%- endfor %}
+                {%- for owner in krate.team_owners %}
+                image("{{ owner.avatar }}", width: 70pt),
+                {%- endfor %}
+            )
+        ]
     ]
 ]
 
-#place(bottom + left)[
-    #text(size: 30pt)[
-        ⚖️ #"{{krate.license}}"
-    ]
+#place(bottom + right, dy: -40pt, dx: -45pt, float: true, scope: "parent")[
+    #image("cargo.png")
 ]
+#place(bottom + left, dx: 75pt, dy: -75pt, float: true, scope: "parent")[
+    #block[
+        #set text(
+            size: 32pt,
+        )
 
-#place(bottom + right)[
-    #grid(
-        columns: ({% for _ in krate.owners -%}auto, {%- endfor %}),
-        column-gutter: 20pt,
-        {%- for owner in krate.owners %}
-        image("{{ owner.avatar }}", width: 70pt),
-        {%- endfor %}
-    )
+        #"crates.io"
+    ]
 ]

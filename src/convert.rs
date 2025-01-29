@@ -6,7 +6,7 @@ use minijinja::{context, Environment};
 use typst::{
     diag::{FileError, FileResult, Warned},
     foundations::{Bytes, Datetime},
-    syntax::{FileId, Source},
+    syntax::{FileId, Source, VirtualPath},
     text::{Font, FontBook},
     utils::LazyHash,
     Library,
@@ -36,15 +36,24 @@ pub struct CrateData {
     pub name: CrateName,
     /// The crate's description
     pub description: TypstString,
-    /// The owners of the crate
-    pub owners: Vec<CrateOwner>,
+    /// The team owners of the crate
+    pub team_owners: Vec<TeamCrateOwner>,
+    /// The user owners of the crate
+    pub user_owners: Vec<UserCrateOwner>,
     /// License information
     pub license: TypstString,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, serde::Serialize)]
-/// A crate owner. Could either be a user or a team.
-pub struct CrateOwner {
+/// A team crate owner
+pub struct TeamCrateOwner {
+    /// URL of the owner's avatar image
+    pub avatar: TypstString,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, serde::Serialize)]
+/// A user crate owner
+pub struct UserCrateOwner {
     /// URL of the owner's avatar image
     pub avatar: TypstString,
 }
@@ -179,6 +188,10 @@ impl typst::World for OgTypstWorld {
     }
 
     fn file(&self, id: FileId) -> FileResult<Bytes> {
+        if id.vpath() == &VirtualPath::new("/cargo.png") {
+            return Ok(Bytes::from_static(include_bytes!("../cargo.png")));
+        }
+
         self.shared
             .avatars
             .entry(id)
@@ -216,7 +229,7 @@ impl typst::World for OgTypstWorld {
 mod tests {
     use std::sync::LazyLock;
 
-    use crate::{augment::CrateDb, convert::CrateOwner};
+    use crate::{augment::CrateDb, convert::UserCrateOwner};
 
     use super::CrateData;
 
@@ -224,14 +237,15 @@ mod tests {
         name: "knien".parse().unwrap(),
         description: "Typed RabbitMQ interfacing for async Rust".into(),
         license: "MIT OR Apache-2.0".into(),
-        owners: vec![
-            CrateOwner {
-                avatar: "https://avatars.githubusercontent.com/u/17907879?v=4".into(),
+        user_owners: vec![
+            UserCrateOwner {
+                avatar: "https://avatars.githubusercontent.com/u/17907879?v=4&s=70".into(),
             },
-            CrateOwner {
-                avatar: "https://avatars.githubusercontent.com/u/8545127?v=4".into(),
+            UserCrateOwner {
+                avatar: "https://avatars.githubusercontent.com/u/8545127?v=4&s=70".into(),
             },
         ],
+        team_owners: vec![],
     });
 
     #[test]

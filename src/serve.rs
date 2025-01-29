@@ -27,8 +27,8 @@ pub struct Serve {
 impl Serve {
     /// Run the [`Serve`] subcommand. Sets up a simple HTTP server that
     /// listens on the configured socket address and exposes the Open
-    /// Graph image generation funcationality under the `/og/:name` and
-    /// `/og/:name/:version` GET endpoints.
+    /// Graph image generation funcationality under the `/og/{name}` and
+    /// GET endpoint.
     pub async fn run(self, common: CommonArgs) -> Result<(), Error> {
         let db = CrateDb::preload_all(common.db_dump_path).await?;
         #[axum::debug_handler]

@@ -4,10 +4,12 @@ use std::{
     path::Path,
 };
 
-use db_dump::{crate_owners::OwnerId, crates::CrateId, versions::VersionId};
+use db_dump::{
+    crate_owners::OwnerId, crates::CrateId, teams::TeamId, users::UserId, versions::VersionId,
+};
 
 use crate::{
-    convert::{CrateData, CrateOwner},
+    convert::{CrateData, TeamCrateOwner, UserCrateOwner},
     error::Error,
     spec::CrateName,
 };
@@ -27,7 +29,8 @@ struct DbDumpCrateOwnerData {
 pub struct CrateDb {
     crates: HashMap<CrateId, DbDumpCrateData>,
     crate_names: HashMap<String, CrateId>,
-    crate_owners: HashMap<OwnerId, Option<DbDumpCrateOwnerData>>,
+    user_crate_owners: HashMap<UserId, Option<DbDumpCrateOwnerData>>,
+    team_crate_owners: HashMap<TeamId, Option<DbDumpCrateOwnerData>>,
     crate_default_versions: HashMap<CrateId, Option<VersionId>>,
     version_licenses: HashMap<(CrateId, VersionId), String>,
 }
@@ -138,10 +141,35 @@ impl CrateDb {
         let crate_owners = crate_owners.into_inner();
         let crate_default_versions = crate_default_versions.into_inner();
 
+        let (user_crate_owners, team_crate_owners) = crate_owners
+            .into_iter()
+            .partition::<HashMap<_, _>, _>(|(k, _)| matches!(k, OwnerId::User(_)));
+        let user_crate_owners = user_crate_owners
+            .into_iter()
+            .map(|(k, v)| {
+                let OwnerId::User(k) = k else {
+                    unreachable!();
+                };
+                (k, v)
+            })
+            .collect();
+
+        let team_crate_owners = team_crate_owners
+            .into_iter()
+            .map(|(k, v)| {
+                let OwnerId::Team(k) = k else {
+                    unreachable!();
+                };
+                (k, v)
+            })
+            .collect();
+
         Ok(Self {
             crates,
             crate_names,
-            crate_owners,
+            // crate_owners,
+            user_crate_owners,
+            team_crate_owners,
             crate_default_versions,
             version_licenses,
         })
@@ -185,19 +213,37 @@ impl CrateDb {
             .as_str()
             .into();
 
-        let owners = data
+        let user_owners = data
             .owners
             .iter()
-            .flat_map(|o| self.crate_owners[o].iter())
-            .map(|DbDumpCrateOwnerData { avatar }| CrateOwner {
-                avatar: avatar.clone().into(),
+            .filter_map(|oid| match oid {
+                OwnerId::User(uid) => Some(uid),
+                OwnerId::Team(_) => None,
+            })
+            .flat_map(|uid| self.user_crate_owners[uid].iter())
+            .map(|DbDumpCrateOwnerData { avatar }| UserCrateOwner {
+                avatar: format!("{avatar}&s=70").into(),
+            })
+            .collect();
+
+        let team_owners = data
+            .owners
+            .iter()
+            .filter_map(|oid| match oid {
+                OwnerId::Team(tid) => Some(tid),
+                OwnerId::User(_) => None,
+            })
+            .flat_map(|tid| self.team_crate_owners[tid].iter())
+            .map(|DbDumpCrateOwnerData { avatar }| TeamCrateOwner {
+                avatar: format!("{avatar}&s=70").into(),
             })
             .collect();
 
         Ok(CrateData {
             name,
             description: data.description.clone().into(),
-            owners,
+            user_owners,
+            team_owners,
             license,
         })
     }
