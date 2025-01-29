@@ -80,6 +80,7 @@ impl CrateDb {
                     description.truncate(idx);
                     description.push('…');
                 };
+                let description = description.trim().replace(|c: char| c.is_whitespace(), " ");
 
                 let data = DbDumpCrateData {
                     description,

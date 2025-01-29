@@ -54,9 +54,9 @@ For instance, to get an image for the `knien` crate at version `0.0.8`, run
 
 ```bash
 # Unoptimized build
-cargo run -- one-shot --name knien --version 0.0.8 --out knien-og.png
+cargo run -- one-shot --name knien --out knien-og.png
 # Optimized build, significantly improves performance
-cargo run --release -- one-shot --name knien --version 0.0.8 --out knien-og.png
+cargo run --release -- one-shot --name knien --out knien-og.png
 ```
 
 Result:

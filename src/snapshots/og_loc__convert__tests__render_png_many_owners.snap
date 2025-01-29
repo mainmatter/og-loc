@@ -1,0 +1,6 @@
+---
+source: src/convert.rs
+expression: rendered
+extension: png
+snapshot_kind: binary
+---
