@@ -4,7 +4,7 @@ expression: rendered
 ---
 #set page(
     width: 1200pt,
-    height: 628pt,
+    height: 630pt,
     fill: rgb("#264323"),
     margin: (x:0pt, y: 0pt)
 )
@@ -17,27 +17,29 @@ expression: rendered
 
 #show image.where(alt: "team_image"): it => box(
   radius: 10pt,
-  clip: true
+  clip: true,
+  fill: white,
 )[#it]
 
 #show image.where(alt: "user_image"): it => box(
   radius: 35pt,
   clip: true,
   stroke: white,
+  fill: white,
 )[#it]
 
 #place(top, dx: 75pt, dy: 75pt, float: true, scope: "parent")[
     #block(width: 1000pt)[
         #block[
             #set text(
-                size: 64pt,
+                size: 60pt,
                 weight: "bold"
             )
             #show regex("([a-z|0-9|_])+"): it => {
                 it.text.codepoints().join(sym.zws)
             }
 
-            *#"knien"*
+            #"knien"
         ]
 
         #block(above: 40pt)[
@@ -48,12 +50,13 @@ expression: rendered
 
             #"Typed RabbitMQ interfacing for async Rust"
         ]
+
         #block(above: 40pt)[
             #stack(
                 dir: rtl,
                 spacing: -5pt,
-                image("https://avatars.githubusercontent.com/u/17907879?v=4&s=70", width: 70pt),
-                image("https://avatars.githubusercontent.com/u/8545127?v=4&s=70", width: 70pt),
+                image("https://avatars.githubusercontent.com/u/17907879?v=4&s=70", width: 70pt, alt: "user_image"),
+                image("https://avatars.githubusercontent.com/u/8545127?v=4&s=70", width: 70pt, alt: "user_image"),
             )
         ]
     ]
@@ -66,6 +69,7 @@ expression: rendered
     #block[
         #set text(
             size: 32pt,
+            weight: "bold",
         )
 
         #"crates.io"

@@ -63,10 +63,6 @@ Result:
 
 ![image](./src/snapshots/og_loc__convert__tests__render_png.snap.png)
 
-*note that this is a very simple prototype and not much work has been put in the styling of the images,
-but this image could fairly easily be styled to match the crates.io style.
-Futhermore, adding more information to the image is quite trivial.*
-
 ### Bulk job
 To run a bulk job for a number of crates, use the `bulk` subcommand:
 

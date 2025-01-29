@@ -263,7 +263,8 @@ mod tests {
             .await
             .unwrap();
         let data = db.augment_crate_spec("knien".parse().unwrap()).unwrap();
-
+        // docker-rust-api
+        // googleapis-tonic-google-cloud-saasaccelerator-management-logs-v1
         assert_eq!(&data, &*KNIEN_CRATE_DATA);
     }
 }

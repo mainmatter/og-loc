@@ -69,8 +69,20 @@ impl CrateDb {
                 if !filter.matches(&c.name) {
                     return;
                 }
+                // Cut off description if it's too long.
+                // Sadly typst doesn't seem to provide a nice
+                // way to do this.
+                let mut description = c.description;
+                if let Some((idx, _)) = description.char_indices().nth(110) {
+                    let idx = description[..idx]
+                        .rfind([' ', ',', '.', ';', '!', '?'])
+                        .unwrap_or(idx);
+                    description.truncate(idx);
+                    description.push('…');
+                };
+
                 let data = DbDumpCrateData {
-                    description: c.description,
+                    description,
                     owners: vec![],
                 };
                 crates.borrow_mut().insert(c.id, data);
@@ -188,6 +200,7 @@ impl CrateDb {
             .map(|DbDumpCrateOwnerData { avatar }| UserCrateOwner {
                 avatar: format!("{avatar}&s=70").into(),
             })
+            .take(3)
             .collect();
 
         let team_owners = data
@@ -201,6 +214,7 @@ impl CrateDb {
             .map(|DbDumpCrateOwnerData { avatar }| TeamCrateOwner {
                 avatar: format!("{avatar}&s=70").into(),
             })
+            .take(3)
             .collect();
 
         Ok(CrateData {
