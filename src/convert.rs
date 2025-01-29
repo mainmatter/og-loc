@@ -1,7 +1,6 @@
 use std::sync::{Arc, LazyLock};
 
 use aho_corasick::AhoCorasick;
-use dashmap::DashMap;
 use minijinja::{context, Environment};
 use typst::{
     diag::{FileError, FileResult, Warned},
@@ -144,8 +143,7 @@ struct OgTypstWorldShared {
     library: LazyHash<Library>,
     book: LazyHash<FontBook>,
     fonts: Vec<FontSlot>,
-    // TODO replace this with a moka cache
-    avatars: DashMap<FileId, Option<Bytes>>,
+    avatars: moka::sync::Cache<FileId, Option<Bytes>>,
 }
 
 impl OgTypstWorld {
@@ -155,7 +153,10 @@ impl OgTypstWorld {
             let shared = OgTypstWorldShared {
                 library: LazyHash::new(Library::default()),
                 book: LazyHash::new(fonts.book),
-                avatars: DashMap::new(),
+                avatars: moka::sync::Cache::builder()
+                    .max_capacity(128)
+                    .initial_capacity(128)
+                    .build(),
                 fonts: fonts.fonts,
             };
             Arc::new(shared)
@@ -192,8 +193,7 @@ impl typst::World for OgTypstWorld {
 
         self.shared
             .avatars
-            .entry(id)
-            .or_insert_with(|| {
+            .get_with(id, || {
                 tokio::runtime::Handle::current().block_on(async {
                     // TODO parse and validate URL
                     let url = id.vpath().as_rootless_path().to_str()?;
