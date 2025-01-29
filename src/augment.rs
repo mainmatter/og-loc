@@ -4,9 +4,7 @@ use std::{
     path::Path,
 };
 
-use db_dump::{
-    crate_owners::OwnerId, crates::CrateId, teams::TeamId, users::UserId, versions::VersionId,
-};
+use db_dump::{crate_owners::OwnerId, crates::CrateId, teams::TeamId, users::UserId};
 
 use crate::{
     convert::{CrateData, TeamCrateOwner, UserCrateOwner},
@@ -31,8 +29,6 @@ pub struct CrateDb {
     crate_names: HashMap<String, CrateId>,
     user_crate_owners: HashMap<UserId, Option<DbDumpCrateOwnerData>>,
     team_crate_owners: HashMap<TeamId, Option<DbDumpCrateOwnerData>>,
-    crate_default_versions: HashMap<CrateId, Option<VersionId>>,
-    version_licenses: HashMap<(CrateId, VersionId), String>,
 }
 
 pub enum LoadFilter {
@@ -58,8 +54,7 @@ impl CrateDb {
     ) -> Result<Self, Error> {
         let crates = RefCell::new(HashMap::new());
         let crate_owners = RefCell::new(HashMap::new());
-        let crate_default_versions = RefCell::new(HashMap::new());
-        let mut version_licenses = HashMap::new();
+
         let mut crate_names = HashMap::new();
         {
             // Sadly, the order in which the CSVs are loaded is non-deterministic,
@@ -79,7 +74,6 @@ impl CrateDb {
                     owners: vec![],
                 };
                 crates.borrow_mut().insert(c.id, data);
-                crate_default_versions.borrow_mut().insert(c.id, None);
                 crate_names.insert(c.name, c.id);
             });
             loader.load(&dump_path)?;
@@ -114,32 +108,10 @@ impl CrateDb {
                     });
             });
             loader.load(&dump_path)?;
-
-            let mut loader = db_dump::Loader::new();
-            loader.default_versions(|dv| {
-                crate_default_versions
-                    .borrow_mut()
-                    .entry(dv.crate_id)
-                    .and_modify(|v| *v = Some(dv.version_id));
-            });
-            loader.load(&dump_path)?;
-
-            let mut loader = db_dump::Loader::new();
-            loader.versions(|v| {
-                if let Some(cid) = crate_default_versions.borrow().get(&v.crate_id) {
-                    let (cid, vid) = match cid.as_ref() {
-                        Some(vid) if *vid == v.id => (v.crate_id, v.id),
-                        _ => return,
-                    };
-                    version_licenses.insert((cid, vid), v.license);
-                }
-            });
-            loader.load(&dump_path)?;
         }
 
         let crates = crates.into_inner();
         let crate_owners = crate_owners.into_inner();
-        let crate_default_versions = crate_default_versions.into_inner();
 
         let (user_crate_owners, team_crate_owners) = crate_owners
             .into_iter()
@@ -170,8 +142,6 @@ impl CrateDb {
             // crate_owners,
             user_crate_owners,
             team_crate_owners,
-            crate_default_versions,
-            version_licenses,
         })
     }
 
@@ -207,12 +177,6 @@ impl CrateDb {
         let id = self.crate_names.get(name.as_ref()).ok_or(Error::NotFound)?;
         let data = &self.crates[id];
 
-        let default_version =
-            &self.crate_default_versions[id].expect("Every crate has a default version");
-        let license = self.version_licenses[&(*id, *default_version)]
-            .as_str()
-            .into();
-
         let user_owners = data
             .owners
             .iter()
@@ -244,7 +208,6 @@ impl CrateDb {
             description: data.description.clone().into(),
             user_owners,
             team_owners,
-            license,
         })
     }
 

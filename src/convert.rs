@@ -40,8 +40,6 @@ pub struct CrateData {
     pub team_owners: Vec<TeamCrateOwner>,
     /// The user owners of the crate
     pub user_owners: Vec<UserCrateOwner>,
-    /// License information
-    pub license: TypstString,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, serde::Serialize)]
@@ -233,10 +231,9 @@ mod tests {
 
     use super::CrateData;
 
-    const KNIEN_CRATE_DATA: LazyLock<CrateData> = LazyLock::new(|| CrateData {
+    static KNIEN_CRATE_DATA: LazyLock<CrateData> = LazyLock::new(|| CrateData {
         name: "knien".parse().unwrap(),
         description: "Typed RabbitMQ interfacing for async Rust".into(),
-        license: "MIT OR Apache-2.0".into(),
         user_owners: vec![
             UserCrateOwner {
                 avatar: "https://avatars.githubusercontent.com/u/17907879?v=4&s=70".into(),
