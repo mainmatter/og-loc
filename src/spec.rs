@@ -1,5 +1,35 @@
 use std::{fmt, str::FromStr};
 
+#[derive(Debug, serde::Deserialize)]
+#[serde(try_from = "&str")]
+pub enum CrateNameOrPngFile {
+    PngFile(CratePngFile),
+    CrateName(CrateName),
+}
+
+impl From<CrateNameOrPngFile> for CrateName {
+    fn from(spec: CrateNameOrPngFile) -> Self {
+        match spec {
+            CrateNameOrPngFile::PngFile(CratePngFile(crate_name)) => crate_name,
+            CrateNameOrPngFile::CrateName(crate_name) => crate_name,
+        }
+    }
+}
+
+impl TryFrom<&str> for CrateNameOrPngFile {
+    type Error = ParseCratePngFileError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match CratePngFile::try_from(value) {
+            Ok(f) => Ok(Self::PngFile(f)),
+            Err(ParseCratePngFileError::NotAPng) => {
+                Ok(Self::CrateName(CrateName::from_str(value)?))
+            }
+            Err(e @ ParseCratePngFileError::InvalidCrateName(_)) => Err(e),
+        }
+    }
+}
+
 /// A valid crate name.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(try_from = "&str")]
@@ -86,6 +116,42 @@ impl FromStr for CrateName {
             );
         }
         Ok(CrateName(name.to_string()))
+    }
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(try_from = "&str")]
+pub struct CratePngFile(CrateName);
+
+#[derive(Debug)]
+pub enum ParseCratePngFileError {
+    NotAPng,
+    InvalidCrateName(<CrateName as FromStr>::Err),
+}
+
+impl std::fmt::Display for ParseCratePngFileError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ParseCratePngFileError::NotAPng => write!(f, "Name does not end in `.png`"),
+            ParseCratePngFileError::InvalidCrateName(e) => write!(f, "Invalid crate name: {e}"),
+        }
+    }
+}
+
+impl From<<CrateName as FromStr>::Err> for ParseCratePngFileError {
+    fn from(e: <CrateName as FromStr>::Err) -> Self {
+        Self::InvalidCrateName(e)
+    }
+}
+
+impl TryFrom<&str> for CratePngFile {
+    type Error = ParseCratePngFileError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        let base = value
+            .strip_suffix(".png")
+            .ok_or(ParseCratePngFileError::NotAPng)?;
+        Ok(Self(base.parse()?))
     }
 }
 

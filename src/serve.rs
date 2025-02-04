@@ -13,7 +13,7 @@ use axum::{
 };
 use tokio::net::TcpListener;
 
-use crate::{augment::CrateDb, error::Error, spec::CrateName, CommonArgs};
+use crate::{augment::CrateDb, error::Error, spec::CrateNameOrPngFile, CommonArgs};
 
 const OG_IMAGE_FALLBACK_URL: &str = "https://crates.io/assets/og-image.png";
 
@@ -33,10 +33,10 @@ impl Serve {
         let db = CrateDb::preload_all(common.db_dump_path).await?;
         #[axum::debug_handler]
         async fn og(
-            Path(spec): Path<CrateName>,
+            Path(spec): Path<CrateNameOrPngFile>,
             State(db): State<Arc<CrateDb>>,
         ) -> Result<Response, Error> {
-            let Ok(data) = db.augment_crate_spec(spec) else {
+            let Ok(data) = db.augment_crate_spec(spec.into()) else {
                 // If anything went wrong, just redirect to the fallback OG image
                 return Ok(Redirect::temporary(OG_IMAGE_FALLBACK_URL).into_response());
             };
@@ -51,8 +51,8 @@ impl Serve {
         }
 
         let app = Router::new()
-            .route("/og/{name}", get(og))
-            .route("/og/{name}/", get(og))
+            .route("/og/{spec}", get(og))
+            .route("/og/{spec}/", get(og))
             .with_state(Arc::new(db));
 
         let listener = TcpListener::bind(self.addr).await?;
