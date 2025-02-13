@@ -2,6 +2,10 @@
 
 Open Graph image generator for crates.io
 
+> [!NOTE]
+> This project has been created by [Mainmatter](https://mainmatter.com/rust-consulting/).  
+> Check out our [landing page](https://mainmatter.com/rust-consulting/) if you're looking for Rust consulting or training!
+
 ## Building
 
 1. Install Rust following the instructions on <https://rustup.rs>.
