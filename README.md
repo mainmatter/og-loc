@@ -124,3 +124,7 @@ OG Loc uses the awesome [Typst](https://typst.app/) typesetting system internall
 [Jinja2 template](./template.typ.j2) that gets filled with information from crates.io.
 The HTTP server is implented using Axum, and the Crates.io database is loaded using [`db_dump`](https://github.com/dtolnay/db-dump).
 
+# License
+  
+Copyright © 2025- Mainmatter GmbH (https://mainmatter.com), released under the
+[MIT](./LICENSE-MIT) and [Apache](./LICENSE-APACHE) licenses.
